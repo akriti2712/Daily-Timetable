@@ -1,79 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Tic Tac Toe — Advanced</title>
+    <title>Day Timetable Planner</title>
     <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-    <nav class="navbar">
-        <h1>🎲 Tic Tac Toe</h1>
-    </nav>
-
-    <!-- Registration -->
-    <section id="register-screen" class="screen active-screen">
-        <h2>Welcome to Tic Tac Toe!</h2>
-        <p>Enter your name to get started</p>
-        <input type="text" id="playerName" placeholder="Enter your name" />
-        <button id="startGame">Continue</button>
-    </section>
-
-    <!-- Mode selection -->
-    <section id="mode-screen" class="screen hidden">
-        <h2>Hello, <span id="displayName"></span>!</h2>
-        <p>Choose your game mode</p>
-        <div class="mode-buttons">
-            <button id="vsComputer">Play vs Computer 🤖</button>
-            <button id="vsPlayer">Play with a Friend 👥</button>
-        </div>
-        <div class="small-note">Scores persist across sessions.</div>
-    </section>
-
-    <!-- Game screen -->
-    <section id="game-screen" class="screen hidden">
-        <div class="top-row">
-            <h2 id="gameTitle">Tic Tac Toe</h2>
-            <div class="scoreboard">
-                <div class="score-item"><strong id="scoreX">0</strong><span id="nameX">Player X</span></div>
-                <div class="score-item draw"><strong id="scoreDraw">0</strong><span>Draws</span></div>
-                <div class="score-item"><strong id="scoreO">0</strong><span id="nameO">Player O</span></div>
+    <!-- Registration Modal -->
+    <div id="registerModal" class="modal">
+        <div class="modal-card">
+            <h2>Welcome 👋</h2>
+            <p>Enter your name to start</p>
+            <input id="regName" type="text" placeholder="Your name" />
+            <div class="row">
+                <button id="btnStart" class="btn primary">Start</button>
+                <button id="btnGuest" class="btn">Continue as Guest</button>
             </div>
-        </div>
-
-        <div id="players" class="players-info"></div>
-
-        <div id="board" class="board" aria-label="Tic Tac Toe board"></div>
-
-        <h3 id="status" class="status"></h3>
-        <div class="controls">
-            <button id="resetBtn" class="btn reset">Restart</button>
-            <button id="backToMenu" class="btn">Back to Menu</button>
-        </div>
-    </section>
-
-    <!-- Congratulations Popup -->
-    <div id="congratsModal" class="modal hidden" role="dialog" aria-modal="true">
-        <div class="modal-content">
-            <button class="modal-close" id="closeCongrats">&times;</button>
-            <div id="confettiArea" class="confetti-area"></div>
-            <h2 id="congratsTitle">Congratulations!</h2>
-            <p id="congratsMsg"></p>
-            <div class="modal-stats">
-                <p>Your session wins: <strong id="sessionWins">0</strong></p>
-                <p>High score (max wins saved): <strong id="highScore">0</strong></p>
-            </div>
-            <div class="modal-actions">
-                <button id="playAgain" class="btn">Play Again</button>
-                <button id="menuFromCongrats" class="btn">Main Menu</button>
-            </div>
+            <small class="muted">Your timetables are saved locally in this browser.</small>
         </div>
     </div>
 
-    <footer>
-        <p>© 2025 Tic-Tac-Toe | Made with ❤️ by Akriti</p>
+    <!-- Topbar -->
+    <header class="topbar">
+        <div class="brand">🗓️ DayTimetable</div>
+        <div class="user-area">
+            <span id="userGreeting">Hello</span>
+            <button id="btnNewTimetable" class="btn small">+ New Timetable</button>
+            <button id="btnLogout" class="btn small ghost">Log out</button>
+        </div>
+    </header>
+
+    <!-- Main layout -->
+    <main class="app-grid">
+        <aside class="sidebar">
+            <h3>Timetables</h3>
+            <input id="searchTimetable" type="search" placeholder="Search timetables..." />
+            <ul id="timetableList" class="list"></ul>
+            <div id="sidebarEmpty" class="sidebar-empty muted">No timetables yet. Create one!</div>
+        </aside>
+
+        <section class="content">
+            <div class="content-head">
+                <div>
+                    <h2 id="ttTitle">Select or Create a Timetable</h2>
+                    <p id="ttMeta" class="muted">Your timetables appear here.</p>
+                </div>
+
+                <div class="controls-row">
+                    <input id="taskTime" type="time" />
+                    <input id="taskTitle" type="text" placeholder="New task (e.g., Math class)" />
+                    <input id="taskNote" type="text" placeholder="Optional note" />
+                    <button id="btnAddTask" class="btn primary">Add Task</button>
+                </div>
+            </div>
+
+            <div id="tasksArea" class="tasks-area">
+                <p class="muted">No timetable selected.</p>
+            </div>
+
+            <div class="content-footer">
+                <button id="btnDeleteTimetable" class="btn danger hidden">Delete Timetable</button>
+                <button id="btnExport" class="btn ghost hidden">Export JSON</button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <small>All data saved locally · Built for learning</small>
     </footer>
 
     <script src="script.js"></script>

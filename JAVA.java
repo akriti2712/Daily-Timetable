@@ -1,458 +1,415 @@
-// Elements
-const registerScreen = document.getElementById("register-screen");
-const modeScreen = document.getElementById("mode-screen");
-const gameScreen = document.getElementById("game-screen");
+/* Working Day Timetable Planner
+ - registration (name or guest)
+ - create/select/delete timetables
+ - add/edit/mark done/delete tasks
+ - persistence via localStorage
+*/
 
-const startGameBtn = document.getElementById("startGame");
-const playerNameInput = document.getElementById("playerName");
-const displayName = document.getElementById("displayName");
+// ---------- Elements ----------
+const registerModal = document.getElementById('registerModal');
+const regName = document.getElementById('regName');
+const btnStart = document.getElementById('btnStart');
+const btnGuest = document.getElementById('btnGuest');
 
-const vsComputerBtn = document.getElementById("vsComputer");
-const vsPlayerBtn = document.getElementById("vsPlayer");
+const userGreeting = document.getElementById('userGreeting');
+const btnNewTimetable = document.getElementById('btnNewTimetable');
+const btnLogout = document.getElementById('btnLogout');
 
-const boardEl = document.getElementById("board");
-const statusText = document.getElementById("status");
-const resetBtn = document.getElementById("resetBtn");
-const backToMenuBtn = document.getElementById("backToMenu");
-const gameTitle = document.getElementById("gameTitle");
-const playersInfo = document.getElementById("players");
+const timetableList = document.getElementById('timetableList');
+const sidebarEmpty = document.getElementById('sidebarEmpty');
+const searchTimetable = document.getElementById('searchTimetable');
 
-const scoreXEl = document.getElementById("scoreX");
-const scoreOEl = document.getElementById("scoreO");
-const scoreDrawEl = document.getElementById("scoreDraw");
-const nameXEl = document.getElementById("nameX");
-const nameOEl = document.getElementById("nameO");
+const ttTitle = document.getElementById('ttTitle');
+const ttMeta = document.getElementById('ttMeta');
+const taskTime = document.getElementById('taskTime');
+const taskTitle = document.getElementById('taskTitle');
+const taskNote = document.getElementById('taskNote');
+const btnAddTask = document.getElementById('btnAddTask');
+const tasksArea = document.getElementById('tasksArea');
 
-// Congrats modal
-const congratsModal = document.getElementById("congratsModal");
-const congratsTitle = document.getElementById("congratsTitle");
-const congratsMsg = document.getElementById("congratsMsg");
-const closeCongrats = document.getElementById("closeCongrats");
-const playAgain = document.getElementById("playAgain");
-const menuFromCongrats = document.getElementById("menuFromCongrats");
-const sessionWinsEl = document.getElementById("sessionWins");
-const highScoreEl = document.getElementById("highScore");
-const confettiArea = document.getElementById("confettiArea");
+const btnDeleteTimetable = document.getElementById('btnDeleteTimetable');
+const btnExport = document.getElementById('btnExport');
 
-// Game state
-let playerName = "";
-let player2Name = "Player 2";
-let gameMode = "player"; // "computer" or "player"
+// ---------- Storage keys ----------
+const USER_KEY = 'dayplanner_user_v1';
+const TIMETABLES_KEY = 'dayplanner_timetables_v1';
 
-let cells = Array(9).fill("");
-let currentPlayer = "X";
-let gameActive = false;
-let lastWinningCombo = null;
+// ---------- State ----------
+let currentUser = null;
+let timetables = []; // {id,title,createdAt,tasks:[]}
+let activeTimetableId = null;
 
-// Score state (persistent)
-const STORAGE_KEY = "tictactoe_scores_v1"; // { playerName: { wins: n }, other: ... , highScore: n }
-let scoreStore = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
-    highScore: 0,
-    players: {}
-};
+// ---------- Utils ----------
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const now = () => new Date().toISOString();
 
-// Session counters
-let sessionWins = {
-    X: 0,
-    O: 0,
-    draw: 0
-};
-
-// winning combos
-const winningCombos = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6]
-];
-
-// -------------------------------------------
-// Utility: show/hide screens
-function showScreen(screenEl) {
-    [registerScreen, modeScreen, gameScreen].forEach(s => {
-        s.classList.add("hidden");
-        s.classList.remove("active-screen");
-    });
-    screenEl.classList.remove("hidden");
-    screenEl.classList.add("active-screen");
+function loadState() {
+    const u = localStorage.getItem(USER_KEY);
+    currentUser = u ? JSON.parse(u) : null;
+    const t = localStorage.getItem(TIMETABLES_KEY);
+    timetables = t ? JSON.parse(t) : [];
 }
 
-// -------------------------------------------
-// Sound generation using WebAudio API (no external files)
-const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
-
-function playTone(freq = 440, duration = 150, type = "sine", volume = 0.12) {
-    try {
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.type = type;
-        o.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        g.gain.setValueAtTime(volume, audioCtx.currentTime);
-        o.connect(g);
-        g.connect(audioCtx.destination);
-        o.start();
-        setTimeout(() => {
-            o.stop();
-        }, duration);
-    } catch (e) {
-        // silent fallback if audio blocked
-        console.warn("Audio error", e);
-    }
+function saveState() {
+    localStorage.setItem(TIMETABLES_KEY, JSON.stringify(timetables));
+    if (currentUser) localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
 }
 
-function playMoveSound() {
-    playTone(550, 80, "sine", 0.06);
+// ---------- Registration ----------
+function openRegister() {
+    registerModal.style.display = 'flex';
 }
 
-function playWinSound() {
-    // short celebratory arpeggio
-    playTone(880, 140, "sine", 0.08);
-    setTimeout(() => playTone(660, 120, "sine", 0.07), 140);
-    setTimeout(() => playTone(990, 160, "sine", 0.08), 260);
+function closeRegister() {
+    registerModal.style.display = 'none';
 }
 
-function playDrawSound() {
-    playTone(300, 180, "sawtooth", 0.06);
-}
-
-// -------------------------------------------
-// Registration
-startGameBtn.addEventListener("click", () => {
-    const name = playerNameInput.value.trim();
+btnStart.addEventListener('click', () => {
+    const name = regName.value.trim();
     if (!name) {
-        alert("Please enter your name.");
+        alert('Please enter your name or continue as Guest.');
+        regName.focus();
         return;
     }
-    playerName = name;
-    displayName.textContent = playerName;
-    showScreen(modeScreen);
-});
-
-// Mode selection
-vsComputerBtn.addEventListener("click", () => startMatch("computer"));
-vsPlayerBtn.addEventListener("click", () => startMatch("player"));
-
-function startMatch(mode) {
-    gameMode = mode;
-    player2Name = mode === "computer" ? "Computer" : "Player 2";
-    showScreen(gameScreen);
-    gameTitle.textContent = mode === "computer" ? "You vs Computer 🤖" : "2 Player Mode 👥";
-    playersInfo.textContent = `${playerName} (X)  —  ${player2Name} (O)`;
-    nameXEl.textContent = `${playerName} (X)`;
-    nameOEl.textContent = `${player2Name} (O)`;
-    initBoard();
-    refreshScoreboard();
-}
-
-// -------------------------------------------
-// Board init
-function initBoard() {
-    boardEl.innerHTML = "";
-    cells = Array(9).fill("");
-    currentPlayer = "X";
-    gameActive = true;
-    lastWinningCombo = null;
-    statusText.textContent = `${getCurrentPlayerName()}'s Turn (${currentPlayer})`;
-    for (let i = 0; i < 9; i++) {
-        const cell = document.createElement("div");
-        cell.classList.add("cell");
-        cell.dataset.index = i;
-        cell.setAttribute("role", "button");
-        cell.addEventListener("click", onCellClick);
-        boardEl.appendChild(cell);
-    }
-    // reset session highlights
-    boardEl.querySelectorAll(".cell").forEach(c => c.style.background = "");
-}
-
-// -------------------------------------------
-function getCurrentPlayerName() {
-    if (gameMode === "computer") return currentPlayer === "X" ? playerName : "Computer";
-    return currentPlayer === "X" ? playerName : player2Name;
-}
-
-// -------------------------------------------
-// Cell click handler
-function onCellClick(e) {
-    if (!gameActive) return;
-    const idx = Number(e.currentTarget.dataset.index);
-    if (cells[idx] !== "") return;
-
-    makeMove(idx, currentPlayer);
-    playMoveSound();
-
-    if (checkWinner()) {
-        gameActive = false;
-        statusText.textContent = `${getCurrentPlayerName()} Wins 🎉`;
-        playWinSound();
-        sessionWins[currentPlayer] += 1;
-        updatePersistentScore(currentPlayer);
-        highlightWinningCombo();
-        showCongrats(getCurrentPlayerName());
-        refreshScoreboard();
-        return;
-    }
-
-    if (!cells.includes("")) {
-        gameActive = false;
-        statusText.textContent = "It's a Draw! 🤝";
-        playDrawSound();
-        sessionWins.draw += 1;
-        persistDraw();
-        refreshScoreboard();
-        showDrawPopup();
-        return;
-    }
-
-    // switch player
-    currentPlayer = currentPlayer === "X" ? "O" : "X";
-    statusText.textContent = `${getCurrentPlayerName()}'s Turn (${currentPlayer})`;
-
-    // computer move if applicable
-    if (gameMode === "computer" && currentPlayer === "O" && gameActive) {
-        setTimeout(computerMove, 500);
-    }
-}
-
-// write a move
-function makeMove(index, player) {
-    cells[index] = player;
-    const el = boardEl.querySelector(`.cell[data-index='${index}']`);
-    if (el) el.textContent = player;
-}
-
-// check winner
-function checkWinner() {
-    lastWinningCombo = null;
-    for (const combo of winningCombos) {
-        const [a, b, c] = combo;
-        if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
-            lastWinningCombo = combo;
-            return true;
-        }
-    }
-    return false;
-}
-
-// highlight winning combo
-function highlightWinningCombo() {
-    if (!lastWinningCombo) return;
-    lastWinningCombo.forEach(i => {
-        const el = boardEl.querySelector(`.cell[data-index='${i}']`);
-        if (el) {
-            el.classList.add("win-animate");
-        }
-    });
-}
-
-// -------------------------------------------
-// Computer move (random fallback). Could upgrade to Minimax later.
-function computerMove() {
-    if (!gameActive) return;
-    const available = cells.map((v, i) => v === "" ? i : null).filter(i => i !== null);
-    if (available.length === 0) return;
-
-    // simple "smart-ish" pick: if computer can win this move, pick it; else block player if possible; else random.
-    // try win
-    for (const i of available) {
-        const copy = [...cells];
-        copy[i] = "O";
-        if (isWinningBoard(copy, "O")) {
-            makeMove(i, "O");
-            playMoveSound();
-            afterComputerMove();
-            return;
-        }
-    }
-    // try block
-    for (const i of available) {
-        const copy = [...cells];
-        copy[i] = "X";
-        if (isWinningBoard(copy, "X")) {
-            makeMove(i, "O");
-            playMoveSound();
-            afterComputerMove();
-            return;
-        }
-    }
-    // else random or center preference
-    if (available.includes(4)) {
-        makeMove(4, "O");
-        playMoveSound();
-        afterComputerMove();
-        return;
-    }
-    const choice = available[Math.floor(Math.random() * available.length)];
-    makeMove(choice, "O");
-    playMoveSound();
-    afterComputerMove();
-}
-
-function afterComputerMove() {
-    if (checkWinner()) {
-        gameActive = false;
-        statusText.textContent = `${getCurrentPlayerName()} Wins 🎉`;
-        playWinSound();
-        sessionWins[currentPlayer] += 1;
-        updatePersistentScore(currentPlayer);
-        highlightWinningCombo();
-        showCongrats(getCurrentPlayerName());
-        refreshScoreboard();
-        return;
-    }
-    if (!cells.includes("")) {
-        gameActive = false;
-        statusText.textContent = "It's a Draw! 🤝";
-        playDrawSound();
-        sessionWins.draw += 1;
-        persistDraw();
-        refreshScoreboard();
-        showDrawPopup();
-        return;
-    }
-    currentPlayer = "X";
-    statusText.textContent = `${getCurrentPlayerName()}'s Turn (${currentPlayer})`;
-}
-
-// helper to test win for hypothetical board
-function isWinningBoard(boardArr, player) {
-    return winningCombos.some(c => boardArr[c[0]] === player && boardArr[c[1]] === player && boardArr[c[2]] === player);
-}
-
-// -------------------------------------------
-// Reset & Back
-resetBtn.addEventListener("click", () => {
-    initBoard();
-    // clear animations
-    boardEl.querySelectorAll(".cell").forEach(c => {
-        c.classList.remove("win-animate");
-        c.style.background = "";
-    });
-});
-
-backToMenuBtn.addEventListener("click", () => {
-    initBoard();
-    showScreen(modeScreen);
-});
-
-// -------------------------------------------
-// Score persistence logic
-function updatePersistentScore(winnerPlayer) {
-    // winnerPlayer is 'X' or 'O'
-    // we attribute wins to names: X -> playerName, O -> player2Name (or Computer)
-    const name = winnerPlayer === "X" ? playerName : player2Name;
-    if (!scoreStore.players[name]) scoreStore.players[name] = {
-        wins: 0
+    currentUser = {
+        name,
+        createdAt: now()
     };
-    scoreStore.players[name].wins += 1;
-
-    // update high score if needed (max wins among all players)
-    const allWins = Object.values(scoreStore.players).map(p => p.wins);
-    const maxWins = allWins.length ? Math.max(...allWins) : 0;
-    if (maxWins > (scoreStore.highScore || 0)) scoreStore.highScore = maxWins;
-
-    // persist
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scoreStore));
-}
-
-function persistDraw() {
-    // track draws aggregated separately on session only; draws not recorded into high score
-    // optionally could store draws per user --> omitted for simplicity
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scoreStore));
-}
-
-// refresh scoreboard area with session counts + persistent high score
-function refreshScoreboard() {
-    scoreXEl.textContent = sessionWins.X;
-    scoreOEl.textContent = sessionWins.O;
-    scoreDrawEl.textContent = sessionWins.draw;
-    highScoreEl && (highScoreEl.textContent = scoreStore.highScore || 0);
-}
-
-// -------------------------------------------
-// Congrats / Draw popups + confetti
-function showCongrats(winnerName) {
-    congratsTitle.textContent = "Congratulations!";
-    congratsMsg.textContent = `${winnerName} wins! 🎉`;
-    sessionWinsEl.textContent = currentPlayer === "X" ? sessionWins.X : sessionWins.O;
-    highScoreEl.textContent = scoreStore.highScore || 0;
-    spawnConfetti();
-    congratsModal.classList.remove("hidden");
-    // stop accepting clicks on board
-    gameActive = false;
-}
-
-function showDrawPopup() {
-    congratsTitle.textContent = "It's a Draw!";
-    congratsMsg.textContent = `Nobody wins — nice match!`;
-    sessionWinsEl.textContent = sessionWins.draw;
-    highScoreEl.textContent = scoreStore.highScore || 0;
-    // small confetti but different style
-    spawnConfetti(40);
-    congratsModal.classList.remove("hidden");
-    gameActive = false;
-}
-
-closeCongrats.addEventListener("click", () => {
-    congratsModal.classList.add("hidden");
-    clearConfetti();
+    saveState();
+    userGreeting.textContent = `Hello, ${currentUser.name}`;
+    closeRegister();
+    renderTimetableList();
+    if (timetables.length) openTimetable(timetables[0].id);
 });
 
-playAgain.addEventListener("click", () => {
-    congratsModal.classList.add("hidden");
-    clearConfetti();
-    initBoard();
+btnGuest.addEventListener('click', () => {
+    currentUser = {
+        name: 'Guest',
+        guest: true,
+        createdAt: now()
+    };
+    saveState();
+    userGreeting.textContent = `Hello, ${currentUser.name}`;
+    closeRegister();
+    renderTimetableList();
+    if (timetables.length) openTimetable(timetables[0].id);
 });
 
-menuFromCongrats.addEventListener("click", () => {
-    congratsModal.classList.add("hidden");
-    clearConfetti();
-    showScreen(modeScreen);
-});
-
-// spawn confetti: creates small colored divs that fall
-function spawnConfetti(count = 80) {
-    clearConfetti();
-    const colors = ["#f44336", "#ff9800", "#ffc107", "#8bc34a", "#00bcd4", "#3f51b5", "#e91e63"];
-    const w = confettiArea.clientWidth || window.innerWidth;
-    for (let i = 0; i < count; i++) {
-        const el = document.createElement("div");
-        el.classList.add("confetti");
-        el.style.background = colors[Math.floor(Math.random() * colors.length)];
-        el.style.left = (Math.random() * 100) + "%";
-        el.style.top = (-10 - Math.random() * 20) + "%";
-        el.style.width = (8 + Math.random() * 10) + "px";
-        el.style.height = (12 + Math.random() * 18) + "px";
-        el.style.opacity = 0.9;
-        el.style.animationDuration = (2 + Math.random() * 2) + "s";
-        el.style.transform = `rotate(${Math.random()*360}deg)`;
-        confettiArea.appendChild(el);
+btnLogout.addEventListener('click', () => {
+    if (confirm('Log out (this will only remove your name locally)?')) {
+        currentUser = null;
+        localStorage.removeItem(USER_KEY);
+        openRegister();
+        userGreeting.textContent = 'Hello';
     }
-    // remove confetti after 3.5s
-    setTimeout(clearConfetti, 3800);
+});
+
+// ---------- Timetable CRUD ----------
+btnNewTimetable.addEventListener('click', createTimetable);
+
+function createTimetable() {
+    const title = prompt('Timetable title (e.g., Monday, Exam Day):', `Timetable ${timetables.length+1}`);
+    if (!title) return;
+    const id = uid();
+    const tt = {
+        id,
+        title: title.trim(),
+        createdAt: now(),
+        tasks: []
+    };
+    timetables.unshift(tt);
+    saveState();
+    activeTimetableId = id;
+    renderTimetableList();
+    openTimetable(id);
 }
 
-function clearConfetti() {
-    confettiArea.innerHTML = "";
+function renderTimetableList(filter = '') {
+    timetableList.innerHTML = '';
+    const visible = timetables.filter(tt => tt.title.toLowerCase().includes(filter.toLowerCase()));
+    if (visible.length === 0) {
+        sidebarEmpty.style.display = 'block';
+    } else {
+        sidebarEmpty.style.display = 'none';
+        visible.forEach(tt => {
+            const li = document.createElement('li');
+            li.dataset.id = tt.id;
+            li.className = (tt.id === activeTimetableId) ? 'active' : '';
+            li.innerHTML = `<div class="meta"><strong>${escapeHtml(tt.title)}</strong><small class="muted">${new Date(tt.createdAt).toLocaleString()}</small></div>
+                      <div class="actions">
+                        <button class="btn tiny edit-tt">Edit</button>
+                        <button class="btn tiny ghost export-tt">Export</button>
+                        <button class="btn tiny danger del-tt">Delete</button>
+                      </div>`;
+            // select
+            li.addEventListener('click', (e) => {
+                if (e.target.closest('.actions')) return;
+                activeTimetableId = tt.id;
+                renderTimetableList(searchTimetable.value || '');
+                openTimetable(tt.id);
+            });
+            // edit title
+            li.querySelector('.edit-tt').addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const newTitle = prompt('Edit timetable title', tt.title);
+                if (newTitle && newTitle.trim()) {
+                    tt.title = newTitle.trim();
+                    saveState();
+                    renderTimetableList(searchTimetable.value || '');
+                    if (activeTimetableId === tt.id) openTimetable(tt.id);
+                }
+            });
+            // export
+            li.querySelector('.export-tt').addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const blob = new Blob([JSON.stringify(tt, null, 2)], {
+                    type: 'application/json'
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${tt.title.replace(/\s+/g,'_')}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+            // delete
+            li.querySelector('.del-tt').addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                if (!confirm(`Delete "${tt.title}"?`)) return;
+                timetables = timetables.filter(x => x.id !== tt.id);
+                if (activeTimetableId === tt.id) {
+                    activeTimetableId = null;
+                    clearMain();
+                }
+                saveState();
+                renderTimetableList(searchTimetable.value || '');
+            });
+
+            timetableList.appendChild(li);
+        });
+    }
 }
 
-// -------------------------------------------
-// On load, try to resume stored highscore and show if needed
-(function onLoad() {
-    // ensure audio context is resumed on first user gesture
-    document.addEventListener("click", () => {
-        if (audioCtx.state === "suspended") audioCtx.resume();
-    }, {
-        once: true
+searchTimetable.addEventListener('input', () => renderTimetableList(searchTimetable.value || ''));
+
+// ---------- Open / Display timetable ----------
+function openTimetable(id) {
+    const tt = timetables.find(t => t.id === id);
+    if (!tt) return clearMain();
+    activeTimetableId = id;
+    ttTitle.textContent = tt.title;
+    ttMeta.textContent = `Created: ${new Date(tt.createdAt).toLocaleString()} · ${tt.tasks.length} tasks`;
+    btnDeleteTimetable.classList.remove('hidden');
+    btnExport.classList.remove('hidden');
+    renderTimetableList(searchTimetable.value || '');
+    renderTasks(tt);
+}
+
+function clearMain() {
+    activeTimetableId = null;
+    ttTitle.textContent = 'Select or Create a Timetable';
+    ttMeta.textContent = 'Your timetables appear here.';
+    btnDeleteTimetable.classList.add('hidden');
+    btnExport.classList.add('hidden');
+    tasksArea.innerHTML = `<p class="muted">No timetable selected.</p>`;
+}
+
+// ---------- Tasks management ----------
+btnAddTask.addEventListener('click', () => {
+    if (!activeTimetableId) {
+        alert('Select or create a timetable first.');
+        return;
+    }
+    const timeVal = taskTime.value || '';
+    const titleVal = (taskTitle.value || '').trim();
+    const noteVal = (taskNote.value || '').trim();
+    if (!titleVal) {
+        alert('Task title required');
+        taskTitle.focus();
+        return;
+    }
+    const tt = timetables.find(t => t.id === activeTimetableId);
+    const task = {
+        id: uid(),
+        time: timeVal,
+        title: titleVal,
+        note: noteVal,
+        done: false,
+        createdAt: now()
+    };
+    tt.tasks.push(task);
+    saveState();
+    renderTasks(tt);
+    taskTime.value = '';
+    taskTitle.value = '';
+    taskNote.value = '';
+});
+
+function renderTasks(tt) {
+    tasksArea.innerHTML = '';
+    if (!tt.tasks || tt.tasks.length === 0) {
+        tasksArea.innerHTML = `<p class="muted">No tasks yet. Add a task using the inputs above.</p>`;
+        ttMeta.textContent = `Created: ${new Date(tt.createdAt).toLocaleString()} · 0 tasks`;
+        return;
+    }
+    // sort by time if set
+    const sorted = [...tt.tasks].sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time) return -1;
+        if (b.time) return 1;
+        return new Date(a.createdAt) - new Date(b.createdAt);
     });
 
-    // if stored players exist, we can show top/highscore in console or later in UI
-    refreshScoreboard();
-})();
+    sorted.forEach(task => {
+        const row = document.createElement('div');
+        row.className = 'task-row' + (task.done ? ' done' : '');
+        row.dataset.id = task.id;
 
-// -------------------------------------------
-// If user closes tab or reloads, we keep scoreStore persistent; sessionWins reset happens on reload (intended)
+        const left = document.createElement('div');
+        left.className = 'task-left';
+        const timeEl = document.createElement('div');
+        timeEl.className = 'time';
+        timeEl.textContent = task.time || '—';
+        const titleEl = document.createElement('div');
+        titleEl.className = 'title';
+        titleEl.textContent = task.title;
+        const noteEl = document.createElement('div');
+        noteEl.className = 'note muted';
+        noteEl.textContent = task.note || '';
+
+        left.appendChild(timeEl);
+        left.appendChild(titleEl);
+        left.appendChild(noteEl);
+
+        const actions = document.createElement('div');
+        actions.className = 'task-actions';
+        const btnEdit = document.createElement('button');
+        btnEdit.className = 'btn tiny edit';
+        btnEdit.textContent = 'Edit';
+        const btnToggle = document.createElement('button');
+        btnToggle.className = 'btn tiny toggle-done';
+        btnToggle.textContent = task.done ? 'Undo' : 'Done';
+        const btnDelete = document.createElement('button');
+        btnDelete.className = 'btn tiny delete';
+        btnDelete.textContent = 'Delete';
+
+        actions.appendChild(btnEdit);
+        actions.appendChild(btnToggle);
+        actions.appendChild(btnDelete);
+        row.appendChild(left);
+        row.appendChild(actions);
+
+        // Edit handler: inline replace with inputs
+        btnEdit.addEventListener('click', () => {
+            const inputTime = document.createElement('input');
+            inputTime.type = 'time';
+            inputTime.className = 'edit-input';
+            inputTime.value = task.time || '';
+            const inputTitle = document.createElement('input');
+            inputTitle.className = 'edit-input';
+            inputTitle.value = task.title;
+            const inputNote = document.createElement('input');
+            inputNote.className = 'edit-input';
+            inputNote.value = task.note || '';
+
+            left.innerHTML = '';
+            left.appendChild(inputTime);
+            left.appendChild(inputTitle);
+            left.appendChild(inputNote);
+            btnEdit.textContent = 'Save';
+            btnEdit.classList.add('primary');
+
+            const saveFn = () => {
+                const newTitle = inputTitle.value.trim();
+                if (!newTitle) {
+                    alert('Title required');
+                    inputTitle.focus();
+                    return;
+                }
+                task.time = inputTime.value || '';
+                task.title = newTitle;
+                task.note = inputNote.value.trim();
+                saveState();
+                renderTasks(tt);
+            };
+            btnEdit.removeEventListener('click', () => {}); // safe no-op
+            btnEdit.addEventListener('click', saveFn, {
+                once: true
+            });
+        });
+
+        btnToggle.addEventListener('click', () => {
+            task.done = !task.done;
+            saveState();
+            renderTasks(tt);
+        });
+
+        btnDelete.addEventListener('click', () => {
+            if (!confirm('Delete this task?')) return;
+            tt.tasks = tt.tasks.filter(tk => tk.id !== task.id);
+            saveState();
+            renderTasks(tt);
+        });
+
+        tasksArea.appendChild(row);
+    });
+
+    ttMeta.textContent = `Created: ${new Date(tt.createdAt).toLocaleString()} · ${tt.tasks.length} tasks`;
+}
+
+// ---------- Delete and Export active timetable ----------
+btnDeleteTimetable.addEventListener('click', () => {
+    if (!activeTimetableId) return;
+    const tt = timetables.find(t => t.id === activeTimetableId);
+    if (!confirm(`Delete timetable "${tt.title}"? This cannot be undone.`)) return;
+    timetables = timetables.filter(t => t.id !== activeTimetableId);
+    activeTimetableId = null;
+    saveState();
+    renderTimetableList();
+    clearMain();
+});
+
+btnExport.addEventListener('click', () => {
+    if (!activeTimetableId) return;
+    const tt = timetables.find(t => t.id === activeTimetableId);
+    const blob = new Blob([JSON.stringify(tt, null, 2)], {
+        type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${tt.title.replace(/\s+/g,'_')}_timetable.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+// ---------- helpers ----------
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    } [c]));
+}
+
+// ---------- boot ----------
+function boot() {
+    loadState();
+    if (currentUser && currentUser.name) {
+        closeRegister();
+        userGreeting.textContent = `Hello, ${currentUser.name}`;
+    } else {
+        openRegister();
+    }
+    renderTimetableList();
+    if (timetables.length > 0) {
+        if (!activeTimetableId) activeTimetableId = timetables[0].id;
+        openTimetable(activeTimetableId);
+    } else {
+        clearMain();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', boot);
