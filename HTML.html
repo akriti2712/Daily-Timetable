@@ -1,43 +1,81 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Basic Calculator</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tic Tac Toe — Advanced</title>
     <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-    <div class="calculator">
-        <input type="text" class="display" id="display" disabled />
+    <nav class="navbar">
+        <h1>🎲 Tic Tac Toe</h1>
+    </nav>
 
-        <div class="buttons">
-            <button class="clear">C</button>
-            <button>(</button>
-            <button>)</button>
-            <button class="operator">/</button>
+    <!-- Registration -->
+    <section id="register-screen" class="screen active-screen">
+        <h2>Welcome to Tic Tac Toe!</h2>
+        <p>Enter your name to get started</p>
+        <input type="text" id="playerName" placeholder="Enter your name" />
+        <button id="startGame">Continue</button>
+    </section>
 
-            <button>7</button>
-            <button>8</button>
-            <button>9</button>
-            <button class="operator">*</button>
+    <!-- Mode selection -->
+    <section id="mode-screen" class="screen hidden">
+        <h2>Hello, <span id="displayName"></span>!</h2>
+        <p>Choose your game mode</p>
+        <div class="mode-buttons">
+            <button id="vsComputer">Play vs Computer 🤖</button>
+            <button id="vsPlayer">Play with a Friend 👥</button>
+        </div>
+        <div class="small-note">Scores persist across sessions.</div>
+    </section>
 
-            <button>4</button>
-            <button>5</button>
-            <button>6</button>
-            <button class="operator">-</button>
+    <!-- Game screen -->
+    <section id="game-screen" class="screen hidden">
+        <div class="top-row">
+            <h2 id="gameTitle">Tic Tac Toe</h2>
+            <div class="scoreboard">
+                <div class="score-item"><strong id="scoreX">0</strong><span id="nameX">Player X</span></div>
+                <div class="score-item draw"><strong id="scoreDraw">0</strong><span>Draws</span></div>
+                <div class="score-item"><strong id="scoreO">0</strong><span id="nameO">Player O</span></div>
+            </div>
+        </div>
 
-            <button>1</button>
-            <button>2</button>
-            <button>3</button>
-            <button class="operator">+</button>
+        <div id="players" class="players-info"></div>
 
-            <button>0</button>
-            <button>.</button>
-            <button class="equal">=</button>
+        <div id="board" class="board" aria-label="Tic Tac Toe board"></div>
+
+        <h3 id="status" class="status"></h3>
+        <div class="controls">
+            <button id="resetBtn" class="btn reset">Restart</button>
+            <button id="backToMenu" class="btn">Back to Menu</button>
+        </div>
+    </section>
+
+    <!-- Congratulations Popup -->
+    <div id="congratsModal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <button class="modal-close" id="closeCongrats">&times;</button>
+            <div id="confettiArea" class="confetti-area"></div>
+            <h2 id="congratsTitle">Congratulations!</h2>
+            <p id="congratsMsg"></p>
+            <div class="modal-stats">
+                <p>Your session wins: <strong id="sessionWins">0</strong></p>
+                <p>High score (max wins saved): <strong id="highScore">0</strong></p>
+            </div>
+            <div class="modal-actions">
+                <button id="playAgain" class="btn">Play Again</button>
+                <button id="menuFromCongrats" class="btn">Main Menu</button>
+            </div>
         </div>
     </div>
+
+    <footer>
+        <p>© 2025 Tic-Tac-Toe | Made with ❤️ by Akriti</p>
+    </footer>
+
     <script src="script.js"></script>
 </body>
 
